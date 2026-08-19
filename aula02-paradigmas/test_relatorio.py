@@ -1,0 +1,2 @@
+from relatorio import relatorio;
+
