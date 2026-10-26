@@ -1,0 +1,11 @@
+```gitignore
+# Arquivos temporários do Python
+__pycache__/
+*.py[cod]
+
+# Ambientes virtuais
+venv/
+
+# Configurações de editores
+.vscode/
+```
