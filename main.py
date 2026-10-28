@@ -35,7 +35,7 @@ def listar_livros(livraria):
     livros = livraria.listar_livros()
     if not livros:
         print("Nenhum livro cadastrado.")
-        return
+        return 
     print("\n--- ESTOQUE DE LIVROS ---")
     for livro in livros:
         print(
