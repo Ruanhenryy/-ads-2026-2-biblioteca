@@ -1,8 +1,10 @@
 from services.livraria import Livraria
+from validation.validacoes import pedir_texto, pedir_float, pedir_int
 from fastapi import FastAPI
 
-app = FastAPI(title="Loja de Roupas")
+app = FastAPI(title="Biblioteca de Bairro")
 livraria = Livraria()
+
 
 @app.get("/livros/listar")
 def listar_livros():
@@ -27,4 +29,18 @@ def cadastrar_livro():
         )
         return f"Livro cadastrado com sucesso! ID: {livro_id}"
     except ValueError as erro:
-        print(f"Não foi possível cadastrar: {erro}")
+        return(f"Não foi possível cadastrar: {erro}")
+
+@app.post("/cliente/cadastrar")
+def cadastrar_cliente():
+    print("\n--- CADASTRAR CLIENTE ---")
+    try:
+        cliente_id = livraria.cadastrar_cliente(
+            pedir_texto("Nome: "),
+            pedir_texto("CPF: "),
+            input("Telefone: ").strip(),
+            input("E-mail: ").strip()
+        )
+        return(f"Cliente cadastrado com sucesso! ID: {cliente_id}")
+    except ValueError as erro:
+        return(f"Não foi possível cadastrar: {erro}")
