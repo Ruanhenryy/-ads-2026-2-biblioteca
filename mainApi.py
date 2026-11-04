@@ -1,46 +1,68 @@
-from services.livraria import Livraria
-from validation.validacoes import pedir_texto, pedir_float, pedir_int
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Biblioteca de Bairro")
-livraria = Livraria()
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel, Field
+
+from services.livraria import Livraria
+
+
+class LivroCadastro(BaseModel):
+    isbn: str = Field(min_length=1)
+    titulo: str = Field(min_length=1)
+    autor: str = Field(min_length=1)
+    preco: float = Field(ge=0)
+    estoque: int = Field(ge=0)
+
+
+class ClienteCadastro(BaseModel):
+    nome: str = Field(min_length=1)
+    cpf: str = Field(min_length=1)
+    telefone: str = ""
+    email: str = ""
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.livraria = Livraria()
+    try:
+        yield
+    finally:
+        app.state.livraria.fechar()
+
+
+app = FastAPI(title="Biblioteca de Bairro", lifespan=lifespan)
 
 
 @app.get("/livros/listar")
-def listar_livros():
-    livros = livraria.listar_livros()
-    if not livros:
-        return "Nenhum livro cadastrado."
-    print("\n--- ESTOQUE DE LIVROS ---")
-    for livro in livros:
-       return f"ID: {livro['id']} | ISBN: {livro['isbn']} | "f"{livro['titulo']} — {livro['autor']} | "f"R$ {livro['preco']:.2f} | Estoque: {livro['estoque']}"
-        
+async def listar_livros(request: Request):
+    return request.app.state.livraria.listar_livros()
+
 
 @app.post("/livros/cadastrar")
-def cadastrar_livro():
-    print("\n--- CADASTRAR LIVRO ---")
+async def cadastrar_livro(livro: LivroCadastro, request: Request):
     try:
-        livro_id = livraria.cadastrar_livro(
-            pedir_texto("ISBN/código único: "),
-            pedir_texto("Título: "),
-            pedir_texto("Autor: "),
-            pedir_float("Preço (R$): "),
-            pedir_int("Quantidade inicial em estoque: ", minimo=0)
+        livro_id = request.app.state.livraria.cadastrar_livro(
+            livro.isbn,
+            livro.titulo,
+            livro.autor,
+            livro.preco,
+            livro.estoque,
         )
-        return f"Livro cadastrado com sucesso! ID: {livro_id}"
     except ValueError as erro:
-        return(f"Não foi possível cadastrar: {erro}")
+        raise HTTPException(status_code=400, detail=str(erro)) from erro
+    return {"mensagem": "Livro cadastrado com sucesso.", "id": livro_id}
+
 
 @app.post("/cliente/cadastrar")
-def cadastrar_cliente():
-    print("\n--- CADASTRAR CLIENTE ---")
+async def cadastrar_cliente(cliente: ClienteCadastro, request: Request):
     try:
-        cliente_id = livraria.cadastrar_cliente(
-            pedir_texto("Nome: "),
-            pedir_texto("CPF: "),
-            input("Telefone: ").strip(),
-            input("E-mail: ").strip()
+        cliente_id = request.app.state.livraria.cadastrar_cliente(
+            cliente.nome,
+            cliente.cpf,
+            cliente.telefone,
+            cliente.email,
         )
-        return(f"Cliente cadastrado com sucesso! ID: {cliente_id}")
     except ValueError as erro:
-        return(f"Não foi possível cadastrar: {erro}")
+        raise HTTPException(status_code=400, detail=str(erro)) from erro
+    return {"mensagem": "Cliente cadastrado com sucesso.", "id": cliente_id}
+
