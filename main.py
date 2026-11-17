@@ -1,7 +1,14 @@
+"""Versão de terminal do Sistema de Livraria.
+
+O arquivo main.py mantém o menu original. Para executar a versão em API,
+utilize mainApi.py com o Uvicorn.
+"""
+
 from services.livraria import Livraria
 
 
 def pedir_texto(mensagem):
+    """Solicita um texto e repete a pergunta se o campo ficar vazio."""
     while True:
         valor = input(mensagem).strip()
         if valor:
@@ -10,6 +17,7 @@ def pedir_texto(mensagem):
 
 
 def pedir_int(mensagem, minimo=1):
+    """Solicita um número inteiro respeitando o valor mínimo."""
     while True:
         try:
             valor = int(input(mensagem))
@@ -21,6 +29,7 @@ def pedir_int(mensagem, minimo=1):
 
 
 def pedir_float(mensagem, minimo=0):
+    """Solicita um número decimal, aceitando vírgula ou ponto."""
     while True:
         try:
             valor = float(input(mensagem).replace(",", "."))
@@ -32,6 +41,7 @@ def pedir_float(mensagem, minimo=0):
 
 
 def listar_livros(livraria):
+    """Exibe os livros cadastrados e a quantidade disponível."""
     livros = livraria.listar_livros()
     if not livros:
         print("Nenhum livro cadastrado.")
@@ -46,6 +56,7 @@ def listar_livros(livraria):
 
 
 def cadastrar_cliente(livraria):
+    """Lê os dados do cliente e chama a regra de cadastro."""
     print("\n--- CADASTRAR CLIENTE ---")
     try:
         cliente_id = livraria.cadastrar_cliente(
@@ -60,6 +71,7 @@ def cadastrar_cliente(livraria):
 
 
 def cadastrar_funcionario(livraria):
+    """Lê os dados do funcionário e chama a regra de cadastro."""
     print("\n--- CADASTRAR FUNCIONÁRIO ---")
     try:
         funcionario_id = livraria.cadastrar_funcionario(
@@ -76,6 +88,7 @@ def cadastrar_funcionario(livraria):
 
 
 def cadastrar_livro(livraria):
+    """Lê os dados do livro e chama a regra de cadastro."""
     print("\n--- CADASTRAR LIVRO ---")
     try:
         livro_id = livraria.cadastrar_livro(
@@ -91,6 +104,7 @@ def cadastrar_livro(livraria):
 
 
 def registrar_compra(livraria):
+    """Coleta cliente, funcionário e itens para formar uma compra."""
     print("\n--- REGISTRAR COMPRA ---")
     clientes = livraria.listar_clientes()
     funcionarios = livraria.listar_funcionarios()
@@ -139,6 +153,7 @@ def registrar_compra(livraria):
 
 
 def historico_cliente(livraria):
+    """Mostra as compras já registradas para um cliente."""
     print("\n--- HISTÓRICO DE COMPRAS ---")
     clientes = livraria.listar_clientes()
     if not clientes:
@@ -165,6 +180,7 @@ def historico_cliente(livraria):
 
 
 def pesquisar_livro(livraria):
+    """Pesquisa livros por título, autor ou ISBN."""
     termo = pedir_texto("Digite título, autor ou ISBN: ")
     resultados = livraria.buscar_livros(termo)
     if not resultados:
@@ -178,7 +194,10 @@ def pesquisar_livro(livraria):
 
 
 def menu():
+    """Cria a conexão e apresenta o menu principal do sistema."""
     livraria = Livraria()
+    # Cada opção associa um número, uma descrição e a função que será chamada.
+    # O uso de lambda permite executar a função somente quando a opção é escolhida.
     opcoes = {
         "1": ("Cadastrar cliente", lambda: cadastrar_cliente(livraria)),
         "2": ("Cadastrar funcionário", lambda: cadastrar_funcionario(livraria)),
@@ -197,6 +216,8 @@ def menu():
         ) or "Nenhum funcionário cadastrado.")),
     }
 
+    # O finally garante que o banco seja fechado mesmo se o menu for encerrado
+    # ou se ocorrer algum erro durante a execução.
     try:
         while True:
             print("\n" + "=" * 42)

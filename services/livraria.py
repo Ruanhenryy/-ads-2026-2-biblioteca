@@ -11,14 +11,25 @@ class Livraria:
             pasta = raiz / "database"
             pasta.mkdir(parents=True, exist_ok=True)
             caminho_banco = pasta / "livraria.db"
-        self.conexao = sqlite3.connect(str(caminho_banco)
-        )
+
+        # check_same_thread=False é necessário porque o FastAPI pode executar
+        # funções síncronas em threads de trabalho. A API cria uma instância
+        # de Livraria para cada requisição e não compartilha conexões entre elas.
+        self.conexao = sqlite3.connect(str(caminho_banco), check_same_thread=False)
+        # Permite acessar as colunas pelo nome, por exemplo: linha["estoque"].
         self.conexao.row_factory = sqlite3.Row
         self._criar_tabelas()
 
     def _criar_tabelas(self):
+        """Cria as tabelas quando o banco ainda não possui essa estrutura.
+
+        IF NOT EXISTS evita apagar ou recriar tabelas que já contêm dados.
+        As chaves estrangeiras ligam compras a clientes e funcionários,
+        e os itens de compra às compras e aos livros.
+        """
         with self.conexao:
             self.conexao.executescript("""
+                -- Faz o SQLite conferir as chaves estrangeiras deste banco.
                 PRAGMA foreign_keys = ON;
 
                 CREATE TABLE IF NOT EXISTS clientes (
@@ -72,13 +83,17 @@ class Livraria:
 
     @staticmethod
     def _validar_textos(*valores):
+        """Impede que campos obrigatórios sejam enviados vazios ou com espaços."""
         if any(not str(valor).strip() for valor in valores):
             raise ValueError("Os campos obrigatórios precisam ser preenchidos.")
 
     def cadastrar_cliente(self, nome, cpf, telefone="", email=""):
+        """Salva um cliente e devolve o ID criado pelo SQLite."""
         self._validar_textos(nome, cpf)
         try:
             with self.conexao:
+                # Os ? são parâmetros: os dados são enviados separados do SQL,
+                # evitando montar comandos por concatenação de textos.
                 cursor = self.conexao.execute(
                     "INSERT INTO clientes (nome, cpf, telefone, email) VALUES (?, ?, ?, ?)",
                     (nome.strip(), cpf.strip(), telefone.strip(), email.strip())
@@ -88,6 +103,7 @@ class Livraria:
             raise ValueError("Já existe um cliente com esse CPF.") from erro
 
     def cadastrar_funcionario(self, nome, cpf, telefone, email, matricula, cargo):
+        """Salva um funcionário; CPF e matrícula não podem se repetir."""
         self._validar_textos(nome, cpf, matricula, cargo)
         try:
             with self.conexao:
@@ -103,6 +119,7 @@ class Livraria:
             raise ValueError("CPF ou matrícula já cadastrado.") from erro
 
     def cadastrar_livro(self, isbn, titulo, autor, preco, estoque):
+        """Cadastra um livro com preço e estoque não negativos."""
         self._validar_textos(isbn, titulo, autor)
         if float(preco) < 0 or int(estoque) < 0:
             raise ValueError("Preço e estoque não podem ser negativos.")
@@ -118,21 +135,25 @@ class Livraria:
             raise ValueError("Já existe um livro com esse ISBN/código.") from erro
 
     def listar_clientes(self):
+        """Retorna todos os clientes em ordem alfabética."""
         return [dict(r) for r in self.conexao.execute(
             "SELECT * FROM clientes ORDER BY nome"
         ).fetchall()]
 
     def listar_funcionarios(self):
+        """Retorna todos os funcionários em ordem alfabética."""
         return [dict(r) for r in self.conexao.execute(
             "SELECT * FROM funcionarios ORDER BY nome"
         ).fetchall()]
 
     def listar_livros(self):
+        """Retorna os livros em ordem de título, incluindo o estoque."""
         return [dict(r) for r in self.conexao.execute(
             "SELECT * FROM livros ORDER BY titulo"
         ).fetchall()]
 
     def buscar_livros(self, termo):
+        """Pesquisa por trecho do título, autor ou ISBN usando LIKE."""
         termo = f"%{termo.strip()}%"
         return [dict(r) for r in self.conexao.execute(
             """SELECT * FROM livros
@@ -145,6 +166,8 @@ class Livraria:
         if not itens:
             raise ValueError("A compra precisa ter pelo menos um item.")
 
+        # Se o mesmo livro aparecer mais de uma vez na requisição, somamos
+        # as quantidades para validar e baixar o estoque corretamente.
         agregados = {}
         for livro_id, quantidade in itens:
             if int(quantidade) <= 0:
@@ -152,6 +175,8 @@ class Livraria:
             agregados[int(livro_id)] = agregados.get(int(livro_id), 0) + int(quantidade)
 
         try:
+            # O bloco with abre uma transação. Se qualquer validação ou INSERT
+            # falhar, o SQLite desfaz todas as alterações feitas neste bloco.
             with self.conexao:
                 cliente = self.conexao.execute(
                     "SELECT id FROM clientes WHERE id = ?", (int(cliente_id),)
@@ -164,6 +189,8 @@ class Livraria:
                 if not funcionario:
                     raise ValueError("Funcionário não encontrado.")
 
+                # Primeiro validamos todos os livros e calculamos o total.
+                # Só depois gravamos a compra e alteramos o estoque.
                 itens_processados = []
                 total = 0.0
                 for livro_id, quantidade in agregados.items():
@@ -195,6 +222,7 @@ class Livraria:
                 )
                 compra_id = cursor.lastrowid
 
+                # Grava cada item da compra e desconta sua quantidade do estoque.
                 for item in itens_processados:
                     self.conexao.execute(
                         """INSERT INTO itens_compra
@@ -213,6 +241,7 @@ class Livraria:
             raise ValueError("Não foi possível registrar a compra. Verifique os dados.") from erro
 
     def historico_cliente(self, cliente_id):
+        """Retorna as compras de um cliente com os respectivos itens."""
         cliente = self.conexao.execute(
             "SELECT id FROM clientes WHERE id = ?", (int(cliente_id),)
         ).fetchone()
@@ -242,4 +271,5 @@ class Livraria:
         return resultado
 
     def fechar(self):
+        """Encerra a conexão com o banco de dados."""
         self.conexao.close()

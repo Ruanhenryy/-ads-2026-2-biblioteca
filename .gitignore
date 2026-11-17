@@ -9,3 +9,9 @@ venv/
 # Configurações de editores
 .vscode/
 ```
+# Outros ambientes virtuais
+.venv/
+env/
+
+# Banco de dados temporário de testes
+*.test.db
