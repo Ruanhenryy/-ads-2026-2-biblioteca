@@ -1,4 +1,4 @@
-# Sistema de Livraria — API com FastAPI e SQLite
+# Sistema de Livraria (API com FastAPI e SQLite)
 
 Projeto acadêmico de ADS baseado na lógica original do Sistema de Livraria.
 A aplicação mantém o menu de terminal em `main.py` e disponibiliza uma API HTTP
